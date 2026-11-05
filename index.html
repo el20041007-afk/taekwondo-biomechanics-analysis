@@ -1,55 +1,409 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>跆拳道動作分析</title>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/vision_bundle.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
-*{box-sizing:border-box}body{margin:0;padding:18px;background:#0b1220;color:#e5e7eb;font-family:Arial,"Microsoft JhengHei",sans-serif}main{max-width:1200px;margin:auto}h1,h2{color:#67e8f9}.grid{display:grid;grid-template-columns:320px 1fr;gap:16px}.card{background:#172033;border:1px solid #334155;border-radius:12px;padding:16px;margin-bottom:16px}label{display:block;margin:10px 0 5px}input{width:100%;padding:9px;background:#253249;color:white;border:1px solid #475569;border-radius:6px}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}button,a{display:inline-block;margin:6px 5px 0 0;padding:9px 12px;border:0;border-radius:7px;background:#0891b2;color:white;text-decoration:none;cursor:pointer}button:disabled{opacity:.55}#status{min-height:2em;color:#fde047}.muted{color:#94a3b8;font-size:.9rem}.videoBox{background:#000}.videoBox video,.videoBox canvas{display:block;width:100%;height:auto}.videoBox canvas{display:none}.chart{height:320px}.scroll{overflow:auto}table{width:100%;border-collapse:collapse;font-size:.88rem}td,th{padding:7px;border-bottom:1px solid #475569;text-align:left;white-space:nowrap}th{color:#67e8f9}.hidden{display:none!important}@media(max-width:800px){.grid{grid-template-columns:1fr}}
+*{box-sizing:border-box}body{margin:0;padding:16px;background:#0b1220;color:#e5e7eb;font-family:Arial,"Microsoft JhengHei",sans-serif}main{max-width:1200px;margin:auto}h1,h2{color:#67e8f9}.grid{display:grid;grid-template-columns:320px minmax(0,1fr);gap:16px}.card{background:#172033;border:1px solid #334155;border-radius:12px;padding:16px;margin-bottom:16px}label{display:block;margin:10px 0 5px}input,select{width:100%;padding:9px;background:#253249;color:white;border:1px solid #475569;border-radius:6px}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}button,a{display:inline-block;margin:6px 5px 0 0;padding:9px 12px;border:0;border-radius:7px;background:#0891b2;color:white;text-decoration:none;cursor:pointer}button:disabled{opacity:.55;cursor:not-allowed}.muted{color:#94a3b8;font-size:.9rem}#status{min-height:2.5em;color:#fde047}.viewer{background:#000}.viewer video,.viewer canvas{display:block;width:100%;height:auto}.viewer canvas{display:none}.chart{height:320px}.scroll{overflow:auto}table{width:100%;border-collapse:collapse;font-size:.88rem}td,th{padding:7px;border-bottom:1px solid #475569;text-align:left;white-space:nowrap}th{color:#67e8f9}.hidden{display:none!important}@media(max-width:800px){.grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body><main>
-<h1>跆拳道動作分析</h1><p class="muted">選取影片後先用原生播放器預覽，再按開始分析。影片只在你的瀏覽器處理，不會上傳。</p>
-<div class="grid"><section class="card"><h2>影片與校正</h2>
+<h1>跆拳道動作分析</h1>
+<p class="muted">選取影片後先用播放器預覽，再按「開始分析」。影片只在你的瀏覽器處理，不會上傳。</p>
+<div class="grid">
+<section class="card">
+<h2>影片與校正</h2>
 <label for="file">選擇影片</label><input id="file" type="file" accept="video/*">
 <div class="row"><div><label for="fps">實際 FPS</label><input id="fps" type="number" value="120" min="1"></div><div><label for="height">身高 (cm)</label><input id="height" type="number" value="168" min="1"></div></div>
-<div class="row"><div><label for="mass">體重 (kg)</label><input id="mass" type="number" value="65" min="1"></div><div><label for="heightPx">影像身高 (px; 0=估算)</label><input id="heightPx" type="number" value="0" min="0"></div></div>
-<div class="row"><div><label for="plumb">鉛垂線偏角 (度)</label><input id="plumb" type="number" value="0" step=".1"></div><div><label for="direction">前方方向 (影像)</label><select id="direction"><option value="1">右方</option><option value="-1">左方</option></select></div></div>
-<div class="row"><div><label for="start">起始影格</label><input id="start" type="number" value="0" min="0"></div><div><label for="end">結束影格 (空白=影片結尾)</label><input id="end" type="number" min="0"></div></div>
-<button id="analyze" disabled>正在載入 AI 模型…</button><div id="status">正在初始化模型；影片預覽可以先使用。</div>
-<p class="muted">首次載入 AI 模型需要網路。MP4 是容器格式；如無法播放，請轉成 H.264 MP4。</p></section>
-<section class="card"><h2>影片預覽 / 骨架</h2><div class="videoBox"><video id="video" controls playsinline preload="metadata"></video><canvas id="overlay"></canvas></div><div><button id="prev">前一幀</button><button id="next">下一幀</button><button id="slow">0.25×</button><button id="half">0.5×</button><button id="normal">1×</button></div><div id="time" class="muted">時間：—</div><a id="csv" class="hidden">下載 CSV</a><a id="png" class="hidden">下載圖表 PNG</a></section></div>
-<section class="card"><h2>關節角度</h2><div class="chart"><canvas id="chart"></canvas></div></section>
-<section class="card"><h2>摘要統計</h2><div class="scroll"><table><thead><tr><th>量</th><th>最小</th><th>時間</th><th>最大</th><th>時間</th><th>平均</th><th>ROM</th></tr></thead><tbody id="summary"></tbody></table></div></section>
-<p class="muted">此為 2D 教學估算；遮擋、視角與關鍵點誤差會影響結果。COM 力學估算不能取代測力板或 3D 動作分析。</p>
+<div class="row"><div><label for="mass">體重 (kg)</label><input id="mass" type="number" value="65" min="1"></div><div><label for="heightPx">影像身高 px（0=估算）</label><input id="heightPx" type="number" value="0" min="0"></div></div>
+<div class="row"><div><label for="plumb">鉛垂線偏角 (度)</label><input id="plumb" type="number" value="0" step="0.1"></div><div><label for="direction">前方方向</label><select id="direction"><option value="1">影像右方</option><option value="-1">影像左方</option></select></div></div>
+<div class="row"><div><label for="start">起始影格</label><input id="start" type="number" value="0" min="0"></div><div><label for="end">結束影格（空白=影片結尾）</label><input id="end" type="number" min="0"></div></div>
+<button id="analyze" disabled>AI 模型載入中…</button><button id="reset">重設</button>
+<div id="status">正在初始化姿態模型；你可以先選影片預覽。</div>
+<p class="muted">首次下載模型需要網路。若播放器可播放但模型載入失敗，請檢查網路是否允許連線到 jsDelivr 和 Google Storage。</p>
+</section>
+<section class="card">
+<h2>影片預覽 / 骨架</h2>
+<div class="viewer"><video id="video" controls playsinline preload="metadata"></video><canvas id="overlay"></canvas></div>
+<div><button id="prev">前一幀</button><button id="next">下一幀</button><button id="slow">0.25×</button><button id="half">0.5×</button><button id="normal">1×</button></div>
+<div id="time" class="muted">時間：—</div><a id="csv" class="hidden">下載 CSV</a><a id="png" class="hidden">下載圖表 PNG</a>
+</section>
+</div>
+<section class="card"><h2>髖、膝、踝與軀幹角度</h2><div class="chart"><canvas id="chart"></canvas></div></section>
+<section class="card"><h2>摘要統計（分析完成後顯示）</h2><div class="scroll"><table><thead><tr><th>量</th><th>最小</th><th>時間</th><th>最大</th><th>時間</th><th>平均</th><th>ROM</th></tr></thead><tbody id="summary"></tbody></table></div></section>
+<p class="muted">2D 估算會受遮擋、視角與姿態點誤差影響。此工具供教學使用，不能取代測力板或 3D 動作分析。</p>
 </main>
 <script>
 'use strict';
-const $=id=>document.getElementById(id),video=$('video'),canvas=$('overlay'),ctx=canvas.getContext('2d');
-let pose=null,rows=[],chart=null,objectUrl=null,processing=false,lastFrame=-1,lastTs=0;
-const G=9.81,cutoff=6;
-function status(s){$('status').textContent=s}function rad(d){return d*Math.PI/180}function deg(r){return r*180/Math.PI}function clamp(x,a,b){return Math.max(a,Math.min(b,x))}
-async function makePose(delegate){const vision=await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/wasm');return PoseLandmarker.createFromOptions(vision,{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task',delegate},runningMode:'VIDEO',numPoses:1,minPoseDetectionConfidence:.5,minPosePresenceConfidence:.5,minTrackingConfidence:.5})}
-(async()=>{try{status('載入姿態模型中…第一次需網路下載。');try{pose=await makePose('GPU')}catch(e){console.warn('GPU unavailable; trying CPU',e);status('GPU 不支援，改用 CPU…');pose=await makePose('CPU')}$('analyze').disabled=false;$('analyze').textContent='開始分析';status('模型就緒。選取影片即可預覽與分析。')}catch(e){console.error(e);status('模型載入失敗；請確認網路可連線到 CDN 與 Google Storage，再重新整理。影片播放器仍可單獨使用。')}})();
-function drawBase(){if(video.readyState<2||!video.videoWidth)return;const w=Math.min(video.videoWidth,1280);canvas.width=w;canvas.height=Math.round(video.videoHeight*w/video.videoWidth);ctx.drawImage(video,0,0,canvas.width,canvas.height)}
-$('file').addEventListener('change',()=>{const f=$('file').files[0];if(!f)return;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(f);video.pause();video.src=objectUrl;video.load();canvas.style.display='none';video.style.display='block';rows=[];status('正在讀取影片：'+f.name);video.onerror=()=>status('瀏覽器無法解碼此影片。請用 Clipchamp 轉成 H.264 MP4。');video.onloadedmetadata=()=>{if(!video.videoWidth){status('影片沒有可讀取的影像，請換檔。');return}drawBase();status(`影片可用：${video.videoWidth}×${video.videoHeight}，${video.duration.toFixed(2)} 秒。可直接按播放器播放。`)};video.onloadeddata=drawBase;for(const id of ['csv','png'])$(id).classList.add('hidden')});
-video.addEventListener('timeupdate',()=>{$('time').textContent='時間：'+video.currentTime.toFixed(3)+' s';if(!processing&&canvas.style.display!=='none')drawBase()});video.addEventListener('seeked',()=>{if(!processing&&canvas.style.display!=='none')drawBase()});
-function pnt(lm,i,w,h,s,phi,sgn){const p=lm[i];if(!p||(p.visibility??1)<.5||(p.presence??1)<.5)return null;const x=p.x*w,y=p.y*h;return[(x*Math.cos(phi)-y*Math.sin(phi))*s*sgn,-(x*Math.sin(phi)+y*Math.cos(phi))*s]}
-function ang(a,b,c){if(!a||!b||!c)return NaN;const u=[a[0]-b[0],a[1]-b[1]],v=[c[0]-b[0],c[1]-b[1]],m=Math.hypot(u[0],u[1])*Math.hypot(v[0],v[1]);if(m<1e-8)return NaN;const cosine=clamp((u[0]*v[0]+u[1]*v[1])/m,-1,1);return deg(Math.acos(cosine))}
-function mid(a,b){return a&&b?[(a[0]+b[0])/2,(a[1]+b[1])/2]:null}function along(a,b,f){return a&&b?[a[0]+f*(b[0]-a[0]),a[1]+f*(b[1]-a[1])]:null}
-function com(p){const defs=[[11,23,.4346,.45],[11,0,.0694,.5],[11,13,.0271,.577],[13,15,.0162,.457],[23,25,.1416,.410],[25,27,.0433,.446],[27,31,.0137,.442],[12,24,.4346,.45],[12,0,.0694,.5],[12,14,.0271,.577],[14,16,.0162,.457],[24,26,.1416,.410],[26,28,.0433,.446],[28,32,.0137,.442]];let sx=0,sy=0,sm=0;for(const[a,b,m,f]of defs){const c=along(p[a],p[b],f);if(c){sx+=c[0]*m;sy+=c[1]*m;sm+=m}}return sm?[sx/sm,sy/sm]:null}
-function measure(lm,t,frame){let hp=+$('heightPx').value;if(!(hp>0)){const n=lm[0],a=lm[28]||lm[27];hp=n&&a?Math.hypot((n.x-a.x)*video.videoWidth,(n.y-a.y)*video.videoHeight):NaN}if(!(hp>0))return null;const s=(+$('height').value/100)/hp,phi=rad(+$('plumb').value||0),sgn=+$('direction').value,p={};for(const i of[0,11,12,13,14,15,16,23,24,25,26,27,28,29,30,31,32])p[i]=pnt(lm,i,video.videoWidth,video.videoHeight,s,phi,sgn);const hip=180-ang(p[12],p[24],p[26]),knee=180-ang(p[24],p[26],p[28]),foot=mid(p[30],p[32]),ankle=foot?90-ang(p[26],p[28],foot):NaN,trunk=p[12]&&p[24]?deg(Math.atan2(p[12][0]-p[24][0],p[12][1]-p[24][1])):NaN,c=com(p);return{frame,time_s:t,hip_flex_deg:hip,knee_flex_deg:knee,ankle_dorsi_deg:ankle,trunk_forward_deg:trunk,com_x_m:c?c[0]:NaN,com_y_m:c?c[1]:NaN}}
-function drawPose(lm,r){drawBase();ctx.strokeStyle='#22d3ee';ctx.lineWidth=3;for(const[a,b]of[[11,12],[11,23],[12,24],[23,24],[23,25],[25,27],[27,29],[29,31],[24,26],[26,28],[28,30],[30,32]]){const x=lm[a],y=lm[b];if(x&&y&&(x.visibility??1)>.3&&(y.visibility??1)>.3){ctx.beginPath();ctx.moveTo(x.x*canvas.width,x.y*canvas.height);ctx.lineTo(y.x*canvas.width,y.y*canvas.height);ctx.stroke()}}ctx.fillStyle='#fb7185';for(const i of[11,12,23,24,25,26,27,28,29,30,31,32]){const x=lm[i];if(x&&(x.visibility??1)>.3){ctx.beginPath();ctx.arc(x.x*canvas.width,x.y*canvas.height,5,0,Math.PI*2);ctx.fill()}}ctx.fillStyle='white';ctx.font='18px Arial';ctx.fillText(`髖 ${fmt(r.hip_flex_deg)}° 膝 ${fmt(r.knee_flex_deg)}° 踝 ${fmt(r.ankle_dorsi_deg)}° 軀幹 ${fmt(r.trunk_forward_deg)}°`,12,28)}function fmt(v){return Number.isFinite(v)?v.toFixed(1):'—'}
-function interpolate(a){const b=a.slice(),ids=b.map((v,i)=>Number.isFinite(v)?i:-1).filter(i=>i>=0);if(!ids.length)return b;for(let i=0;i<ids[0];i++)b[i]=b[ids[0]];for(let i=ids[ids.length-1]+1;i<b.length;i++)b[i]=b[ids[ids.length-1]];for(let k=0;k<ids.length-1;k++){const l=ids[k],r=ids[k+1];for(let i=l+1;i<r;i++)b[i]=b[l]+(b[r]-b[l])*(i-l)/(r-l)}return b}
-function biquad(a,fs,q){const w=2*Math.PI*cutoff/fs,c=Math.cos(w),al=Math.sin(w)/(2*q),a0=1+al,b0=(1-c)/(2*a0),b1=(1-c)/a0,b2=b0,a1=-2*c/a0,a2=(1-al)/a0;let x1=0,x2=0,y1=0,y2=0;return a.map(x=>{const y=b0*x+b1*x1+b2*x2-a1*y1-a2*y2;x2=x1;x1=x;y2=y1;y1=y;return y})}
-function smooth(a,fs){if(a.length<5||cutoff>=fs/2)return a.slice();let b=interpolate(a);for(const q of[.5411961,1.306563])b=biquad(b,fs,q);b.reverse();for(const q of[.5411961,1.306563])b=biquad(b,fs,q);return b.reverse()}
-function diff(a,t){return a.map((v,i)=>{if(a.length<2)return NaN;if(i===0)return(a[1]-v)/(t[1]-t[0]);if(i===a.length-1)return(v-a[i-1])/(t[i]-t[i-1]);return(a[i+1]-a[i-1])/(t[i+1]-t[i-1])})}
-function finish(){processing=false;if(!rows.length){status('沒有偵測到姿態；請讓全身入鏡、光線充足，並檢查起始影格。');return}status('分析完成，正在整理圖表與 CSV…');const fs=+$('fps').value,m=+$('mass').value,keys=['hip_flex_deg','knee_flex_deg','ankle_dorsi_deg','trunk_forward_deg','com_x_m','com_y_m'];for(const k of keys){const a=smooth(rows.map(r=>r[k]),fs);rows.forEach((r,i)=>r[k+'_filtered']=a[i])}const t=rows.map(r=>r.time_s),vx=diff(rows.map(r=>r.com_x_m_filtered),t),vy=diff(rows.map(r=>r.com_y_m_filtered),t),ax=diff(vx,t),ay=diff(vy,t);let impulse=0;rows.forEach((r,i)=>{r.com_vx_m_s=vx[i];r.com_vy_m_s=vy[i];r.com_ax_m_s2=ax[i];r.com_ay_m_s2=ay[i];r.net_fx_N=m*ax[i];r.net_fy_N=m*ay[i];r.grf_vertical_est_N=m*(ay[i]+G);r.grf_vertical_est_BW=r.grf_vertical_est_N/(m*G);r.momentum_x_kg_m_s=m*vx[i];r.momentum_y_kg_m_s=m*vy[i];r.net_power_W=r.net_fx_N*vx[i]+r.net_fy_N*vy[i];if(i)impulse+=(rows[i-1].grf_vertical_est_N+r.grf_vertical_est_N)*.5*(t[i]-t[i-1]);r.vertical_impulse_est_Ns=impulse});renderChart();renderSummary();exportCSV();$('png').href=$('chart').toDataURL('image/png');$('png').download='taekwondo_chart.png';$('png').classList.remove('hidden');status('分析完成。力學數值為 COM 估計，不能替代測力板。')}
-function renderChart(){if(chart)chart.destroy();chart=new Chart($('chart'),{type:'line',data:{labels:rows.map(r=>r.time_s.toFixed(3)),datasets:[['髖屈曲 (deg)','hip_flex_deg_filtered','#a78bfa'],['膝屈曲 (deg)','knee_flex_deg_filtered','#22d3ee'],['踝背屈 (deg)','ankle_dorsi_deg_filtered','#f97316'],['軀幹前傾 (deg)','trunk_forward_deg_filtered','#fb7185']].map(([label,key,color])=>({label,data:rows.map(r=>r[key]),borderColor:color,pointRadius:0,borderWidth:2}))},options:{responsive:true,maintainAspectRatio:false,animation:false,scales:{x:{ticks:{color:'#94a3b8',maxTicksLimit:12},title:{display:true,text:'時間 (s)',color:'#cbd5e1'}},y:{ticks:{color:'#94a3b8'},title:{display:true,text:'角度 (deg)',color:'#cbd5e1'}}}}})}
-function renderSummary(){const b=$('summary');b.innerHTML='';for(const[label,key]of[['髖屈曲','hip_flex_deg_filtered'],['膝屈曲','knee_flex_deg_filtered'],['踝背屈','ankle_dorsi_deg_filtered'],['軀幹前傾','trunk_forward_deg_filtered'],['COM x (m)','com_x_m_filtered'],['COM y (m)','com_y_m_filtered']]){const a=rows.map(r=>({v:r[key],t:r.time_s})).filter(x=>Number.isFinite(x.v));if(!a.length)continue;const mn=a.reduce((x,y)=>x.v<y.v?x:y),mx=a.reduce((x,y)=>x.v>y.v?x:y),avg=a.reduce((s,x)=>s+x.v,0)/a.length;b.insertAdjacentHTML('beforeend',`<tr><td>${label}</td><td>${mn.v.toFixed(2)}</td><td>${mn.t.toFixed(3)} s</td><td>${mx.v.toFixed(2)}</td><td>${mx.t.toFixed(3)} s</td><td>${avg.toFixed(2)}</td><td>${(mx.v-mn.v).toFixed(2)}</td></tr>`)}}
-function exportCSV(){const cols=['frame','time_s','hip_flex_deg','hip_flex_deg_filtered','knee_flex_deg','knee_flex_deg_filtered','ankle_dorsi_deg','ankle_dorsi_deg_filtered','trunk_forward_deg','trunk_forward_deg_filtered','com_x_m','com_x_m_filtered','com_y_m','com_y_m_filtered','com_vx_m_s','com_vy_m_s','com_ax_m_s2','com_ay_m_s2','net_fx_N','net_fy_N','grf_vertical_est_N','grf_vertical_est_BW','momentum_x_kg_m_s','momentum_y_kg_m_s','net_power_W','vertical_impulse_est_Ns'];const text='\ufeff'+[cols.join(','),...rows.map(r=>cols.map(k=>Number.isFinite(r[k])?r[k]:'').join(','))].join('\r\n'),a=$('csv');a.href=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'}));a.download='taekwondo_analysis.csv';a.classList.remove('hidden')}
-function loop(now,meta){if(!processing)return;const time=meta.mediaTime,frame=Math.round(time*(+$('fps').value)),end=$('end').value===''?Infinity:+$('end').value;if(frame>end){video.pause();finish();return}if(frame>=+$('start').value&&frame!==lastFrame){lastFrame=frame;try{lastTs=Math.max(performance.now(),lastTs+1);const result=pose.detectForVideo(video,lastTs),lm=result.landmarks?.[0];if(lm){const r=measure(lm,time,frame);if(r){rows.push(r);drawPose(lm,r)}}}catch(e){console.error(e);processing=false;status('AI 分析發生錯誤，請重新整理後再試。');return}}if(processing&&!video.paused&&!video.ended)video.requestVideoFrameCallback(loop);else if(video.ended)finish()}
-$('analyze').onclick=()=>{if(!video.src||!video.videoWidth){alert('請先選影片並等播放器載入完成。');return}if(!pose){alert('姿態模型未載入完成，請稍候。');return}const fps=+$('fps').value,start=(+$('start').value||0)/fps;if(!(fps>0)||start>=video.duration){alert('請檢查 FPS 與起始影格。');return}rows=[];lastFrame=-1;lastTs=0;processing=false;video.pause();canvas.width=Math.min(video.videoWidth,1280);canvas.height=Math.round(video.videoHeight*canvas.width/video.videoWidth);canvas.style.display='block';video.style.display='none';const begin=()=>{video.removeEventListener('seeked',begin);processing=true;status('分析中，請保持頁面開啟…');video.play().then(()=>video.requestVideoFrameCallback(loop)).catch(e=>{processing=false;status('影片播放失敗：'+e.message)})};if(Math.abs(video.currentTime-start)<.001)begin();else{video.addEventListener('seeked',begin);video.currentTime=start}};
-video.addEventListener('pause',()=>{if(processing&&!video.ended){processing=false;finish()}});$('prev').onclick=()=>{if(video.src){video.pause();canvas.style.display='none';video.style.display='block';video.currentTime=Math.max(0,video.currentTime-1/(+$('fps').value||120))}};$('next').onclick=()=>{if(video.src){video.pause();canvas.style.display='none';video.style.display='block';video.currentTime=Math.min(video.duration,video.currentTime+1/(+$('fps').value||120))}};$('slow').onclick=()=>video.playbackRate=.25;$('half').onclick=()=>video.playbackRate=.5;$('normal').onclick=()=>video.playbackRate=1;
-</script></body></html>
+const $ = (id) => document.getElementById(id);
+const video = $('video');
+const canvas = $('overlay');
+const ctx = canvas.getContext('2d');
+const G = 9.81;
+const CUTOFF = 6;
+let pose = null;
+let rows = [];
+let chart = null;
+let objectUrl = null;
+let processing = false;
+let lastFrame = -1;
+let lastTimestamp = 0;
+
+function setStatus(text) { $('status').textContent = text; }
+function radians(value) { return value * Math.PI / 180; }
+function degrees(value) { return value * 180 / Math.PI; }
+function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+function fmt(value) { return Number.isFinite(value) ? value.toFixed(1) : '—'; }
+
+async function createPose(delegate) {
+  const vision = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/wasm');
+  return PoseLandmarker.createFromOptions(vision, {
+    baseOptions: {
+      modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+      delegate
+    },
+    runningMode: 'VIDEO',
+    numPoses: 1,
+    minPoseDetectionConfidence: 0.5,
+    minPosePresenceConfidence: 0.5,
+    minTrackingConfidence: 0.5
+  });
+}
+
+async function initializePose() {
+  if (typeof FilesetResolver === 'undefined' || typeof PoseLandmarker === 'undefined') {
+    setStatus('MediaPipe 程式庫載入失敗。請確認網路可連 jsDelivr，重新整理後再試。');
+    return;
+  }
+  setStatus('正在載入姿態模型（首次載入可能需要一分鐘）…');
+  try {
+    try {
+      pose = await createPose('GPU');
+    } catch (gpuError) {
+      console.warn('GPU 初始化失敗，改用 CPU。', gpuError);
+      setStatus('GPU 無法使用，改以 CPU 載入模型…');
+      pose = await createPose('CPU');
+    }
+    $('analyze').disabled = false;
+    $('analyze').textContent = '開始分析';
+    setStatus('姿態模型已載入。選擇影片並按「開始分析」。');
+  } catch (error) {
+    console.error(error);
+    $('analyze').disabled = true;
+    $('analyze').textContent = '模型載入失敗';
+    setStatus('模型載入失敗。請確認網路可連 jsDelivr 與 Google Storage，之後重新整理。影片仍可用播放器預覽。');
+  }
+}
+initializePose();
+
+function drawBaseFrame() {
+  if (video.readyState < 2 || !video.videoWidth) return;
+  const width = Math.min(video.videoWidth, 1280);
+  canvas.width = width;
+  canvas.height = Math.round(video.videoHeight * width / video.videoWidth);
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+}
+
+$('file').addEventListener('change', () => {
+  const file = $('file').files[0];
+  if (!file) return;
+  if (objectUrl) URL.revokeObjectURL(objectUrl);
+  objectUrl = URL.createObjectURL(file);
+  video.pause();
+  video.src = objectUrl;
+  video.load();
+  video.style.display = 'block';
+  canvas.style.display = 'none';
+  rows = [];
+  setStatus(`正在讀取影片：${file.name}`);
+  video.onerror = () => setStatus('瀏覽器無法解碼此影片。MP4 是容器格式，請轉成 H.264 MP4。');
+  video.onloadedmetadata = () => {
+    if (!video.videoWidth) {
+      setStatus('影片沒有可讀取的影像，請換一個影片檔。');
+      return;
+    }
+    setStatus(`影片可播放：${video.videoWidth}×${video.videoHeight}，${video.duration.toFixed(2)} 秒。按播放器的播放鍵預覽，或開始分析。`);
+    drawBaseFrame();
+  };
+  video.onloadeddata = drawBaseFrame;
+  $('csv').classList.add('hidden');
+  $('png').classList.add('hidden');
+});
+
+video.addEventListener('timeupdate', () => {
+  $('time').textContent = `時間：${video.currentTime.toFixed(3)} s`;
+  if (!processing && canvas.style.display !== 'none') drawBaseFrame();
+});
+video.addEventListener('seeked', () => {
+  if (!processing && canvas.style.display !== 'none') drawBaseFrame();
+});
+video.addEventListener('ended', () => {
+  if (processing) finishAnalysis();
+});
+
+function imagePoint(landmarks, index, scale, phi, forward) {
+  const landmark = landmarks[index];
+  if (!landmark || (landmark.visibility ?? 1) < 0.5 || (landmark.presence ?? 1) < 0.5) return null;
+  const px = landmark.x * video.videoWidth;
+  const py = landmark.y * video.videoHeight;
+  const x = (px * Math.cos(phi) - py * Math.sin(phi)) * scale * forward;
+  const y = -(px * Math.sin(phi) + py * Math.cos(phi)) * scale;
+  return [x, y];
+}
+
+function jointAngle(a, b, c) {
+  if (!a || !b || !c) return NaN;
+  const u = [a[0] - b[0], a[1] - b[1]];
+  const v = [c[0] - b[0], c[1] - b[1]];
+  const magnitude = Math.hypot(u[0], u[1]) * Math.hypot(v[0], v[1]);
+  if (magnitude < 1e-8) return NaN;
+  const cosine = clamp((u[0] * v[0] + u[1] * v[1]) / magnitude, -1, 1);
+  return degrees(Math.acos(cosine));
+}
+
+function midpoint(a, b) {
+  return a && b ? [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] : null;
+}
+
+function interpolateMissing(values) {
+  const result = values.slice();
+  const valid = result.map((value, index) => Number.isFinite(value) ? index : -1).filter(index => index >= 0);
+  if (!valid.length) return result;
+  for (let i = 0; i < valid[0]; i++) result[i] = result[valid[0]];
+  const last = valid[valid.length - 1];
+  for (let i = last + 1; i < result.length; i++) result[i] = result[last];
+  for (let j = 0; j < valid.length - 1; j++) {
+    const left = valid[j];
+    const right = valid[j + 1];
+    for (let i = left + 1; i < right; i++) {
+      result[i] = result[left] + (result[right] - result[left]) * (i - left) / (right - left);
+    }
+  }
+  return result;
+}
+
+function filterSection(values, fs, q) {
+  const omega = 2 * Math.PI * CUTOFF / fs;
+  const cosine = Math.cos(omega);
+  const alpha = Math.sin(omega) / (2 * q);
+  const a0 = 1 + alpha;
+  const b0 = (1 - cosine) / (2 * a0);
+  const b1 = (1 - cosine) / a0;
+  const b2 = b0;
+  const a1 = -2 * cosine / a0;
+  const a2 = (1 - alpha) / a0;
+  let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  return values.map(x => {
+    const y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+    x2 = x1; x1 = x; y2 = y1; y1 = y;
+    return y;
+  });
+}
+
+function smooth(values, fs) {
+  if (values.length < 5 || CUTOFF >= fs / 2) return values.slice();
+  let result = interpolateMissing(values);
+  result = filterSection(result, fs, 0.5411961);
+  result = filterSection(result, fs, 1.306563);
+  result.reverse();
+  result = filterSection(result, fs, 0.5411961);
+  result = filterSection(result, fs, 1.306563);
+  return result.reverse();
+}
+
+function derivative(values, times) {
+  return values.map((value, index) => {
+    if (values.length < 2) return NaN;
+    if (index === 0) return (values[1] - value) / (times[1] - times[0]);
+    if (index === values.length - 1) return (value - values[index - 1]) / (times[index] - times[index - 1]);
+    return (values[index + 1] - values[index - 1]) / (times[index + 1] - times[index - 1]);
+  });
+}
+
+function estimateCom(points) {
+  // Approximate de Leva-style segment fractions. This is an instructional estimate.
+  const definitions = [
+    [11,23,0.4346,0.45],[11,0,0.0694,0.5],[11,13,0.0271,0.577],[13,15,0.0162,0.457],
+    [23,25,0.1416,0.410],[25,27,0.0433,0.446],[27,31,0.0137,0.442],
+    [12,24,0.4346,0.45],[12,0,0.0694,0.5],[12,14,0.0271,0.577],[14,16,0.0162,0.457],
+    [24,26,0.1416,0.410],[26,28,0.0433,0.446],[28,32,0.0137,0.442]
+  ];
+  let x = 0, y = 0, total = 0;
+  for (const [from, to, mass, fraction] of definitions) {
+    const a = points[from], b = points[to];
+    if (!a || !b) continue;
+    const cx = a[0] + fraction * (b[0] - a[0]);
+    const cy = a[1] + fraction * (b[1] - a[1]);
+    x += cx * mass; y += cy * mass; total += mass;
+  }
+  return total ? [x / total, y / total] : null;
+}
+
+function calculateFrame(landmarks, time) {
+  let heightPx = Number($('heightPx').value);
+  if (!(heightPx > 0)) {
+    const nose = landmarks[0];
+    const ankle = landmarks[28] || landmarks[27];
+    if (nose && ankle) heightPx = Math.hypot((nose.x - ankle.x) * video.videoWidth, (nose.y - ankle.y) * video.videoHeight);
+  }
+  if (!(heightPx > 0)) return null;
+  const scale = (Number($('height').value) / 100) / heightPx;
+  const phi = radians(Number($('plumb').value) || 0);
+  const forward = Number($('direction').value);
+  const points = {};
+  for (const index of [0,11,12,13,14,15,16,23,24,25,26,27,28,29,30,31,32]) {
+    points[index] = imagePoint(landmarks, index, scale, phi, forward);
+  }
+  const hip = points[24], knee = points[26], ankle = points[28], shoulder = points[12];
+  const hipFlex = 180 - jointAngle(shoulder, hip, knee);
+  const kneeFlex = 180 - jointAngle(hip, knee, ankle);
+  const foot = midpoint(points[30], points[32]);
+  const ankleAngle = foot ? 90 - jointAngle(knee, ankle, foot) : NaN;
+  const trunk = shoulder && hip ? degrees(Math.atan2(shoulder[0] - hip[0], shoulder[1] - hip[1])) : NaN;
+  const center = estimateCom(points);
+  return {
+    frame: Math.round(time * Number($('fps').value)), time_s: time,
+    hip_flex_deg: hipFlex, knee_flex_deg: kneeFlex, ankle_dorsi_deg: ankleAngle,
+    trunk_forward_deg: trunk, com_x_m: center ? center[0] : NaN, com_y_m: center ? center[1] : NaN
+  };
+}
+
+function drawSkeleton(landmarks, data) {
+  drawBaseFrame();
+  const links = [[11,12],[11,23],[12,24],[23,24],[23,25],[25,27],[27,29],[29,31],[24,26],[26,28],[28,30],[30,32]];
+  ctx.strokeStyle = '#22d3ee';
+  ctx.lineWidth = Math.max(2, canvas.width / 300);
+  for (const [a, b] of links) {
+    const p = landmarks[a], q = landmarks[b];
+    if (!p || !q || (p.visibility ?? 1) < 0.3 || (q.visibility ?? 1) < 0.3) continue;
+    ctx.beginPath(); ctx.moveTo(p.x * canvas.width, p.y * canvas.height); ctx.lineTo(q.x * canvas.width, q.y * canvas.height); ctx.stroke();
+  }
+  ctx.fillStyle = '#fb7185';
+  for (const index of [11,12,23,24,25,26,27,28,29,30,31,32]) {
+    const p = landmarks[index];
+    if (!p || (p.visibility ?? 1) < 0.3) continue;
+    ctx.beginPath(); ctx.arc(p.x * canvas.width, p.y * canvas.height, Math.max(3, canvas.width / 240), 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.fillStyle = '#fff'; ctx.font = `${Math.max(14, canvas.width / 65)}px Arial`;
+  ctx.fillText(`髖 ${fmt(data.hip_flex_deg)}°  膝 ${fmt(data.knee_flex_deg)}°  踝 ${fmt(data.ankle_dorsi_deg)}°  軀幹 ${fmt(data.trunk_forward_deg)}°`, 12, 26);
+}
+
+function finishAnalysis() {
+  if (!processing) return;
+  processing = false;
+  if (!rows.length) {
+    setStatus('沒有偵測到有效姿態。請確認全身入鏡、光線足夠，並檢查起訖影格。');
+    video.style.display = 'block'; canvas.style.display = 'none';
+    return;
+  }
+  setStatus(`偵測完成，共 ${rows.length} 筆影格；正在產生圖表與 CSV…`);
+  const fs = Number($('fps').value), mass = Number($('mass').value), keys = ['hip_flex_deg','knee_flex_deg','ankle_dorsi_deg','trunk_forward_deg','com_x_m','com_y_m'];
+  for (const key of keys) {
+    const filtered = smooth(rows.map(row => row[key]), fs);
+    rows.forEach((row, i) => { row[key + '_filtered'] = filtered[i]; });
+  }
+  const times = rows.map(row => row.time_s);
+  const vx = derivative(rows.map(row => row.com_x_m_filtered), times);
+  const vy = derivative(rows.map(row => row.com_y_m_filtered), times);
+  const ax = derivative(vx, times), ay = derivative(vy, times);
+  let impulse = 0;
+  rows.forEach((row, i) => {
+    row.com_vx_m_s = vx[i]; row.com_vy_m_s = vy[i]; row.com_ax_m_s2 = ax[i]; row.com_ay_m_s2 = ay[i];
+    row.net_fx_N = mass * ax[i]; row.net_fy_N = mass * ay[i];
+    row.grf_vertical_est_N = mass * (ay[i] + G); row.grf_vertical_est_BW = row.grf_vertical_est_N / (mass * G);
+    row.momentum_x_kg_m_s = mass * vx[i]; row.momentum_y_kg_m_s = mass * vy[i];
+    row.net_power_W = row.net_fx_N * vx[i] + row.net_fy_N * vy[i];
+    if (i > 0) impulse += (rows[i - 1].grf_vertical_est_N + row.grf_vertical_est_N) * 0.5 * (times[i] - times[i - 1]);
+    row.vertical_impulse_est_Ns = impulse;
+  });
+  renderChart(); renderSummary(); exportCsv();
+  $('png').href = $('chart').toDataURL('image/png'); $('png').download = 'taekwondo_chart.png'; $('png').classList.remove('hidden');
+  setStatus('分析完成。請查看圖表、摘要及 CSV；COM 動力學是簡化估計，不是測力板量測。');
+}
+
+function frameCallback(now, metadata) {
+  if (!processing) return;
+  const time = metadata.mediaTime;
+  const frame = Math.round(time * Number($('fps').value));
+  const endValue = $('end').value.trim();
+  const endFrame = endValue ? Number(endValue) : Infinity;
+  if (frame > endFrame || video.ended) { video.pause(); finishAnalysis(); return; }
+  if (frame >= Number($('start').value || 0) && frame !== lastFrame) {
+    lastFrame = frame;
+    try {
+      lastTimestamp = Math.max(performance.now(), lastTimestamp + 1);
+      const result = pose.detectForVideo(video, lastTimestamp);
+      const landmarks = result.landmarks && result.landmarks[0];
+      if (landmarks) {
+        const data = calculateFrame(landmarks, time);
+        if (data) { rows.push(data); drawSkeleton(landmarks, data); }
+      }
+    } catch (error) {
+      console.error(error); processing = false; video.pause();
+      setStatus('姿態偵測錯誤。請重新整理頁面後重試，並確認模型已載入。'); return;
+    }
+  }
+  $('time').textContent = `時間：${time.toFixed(3)} s｜影格 ${frame}`;
+  if (processing && !video.paused && !video.ended) video.requestVideoFrameCallback(frameCallback);
+  else if (video.ended) finishAnalysis();
+}
+
+function startAnalysis() {
+  if (!video.src || !video.videoWidth) { alert('請先選取影片，等待影片資訊載入完成。'); return; }
+  if (!pose) { alert('姿態模型尚未載入完成，請等待狀態更新。'); return; }
+  const fps = Number($('fps').value);
+  const startTime = Number($('start').value || 0) / fps;
+  if (!(fps > 0) || startTime >= video.duration) { alert('請確認 FPS 和起始影格設定。'); return; }
+  rows = []; lastFrame = -1; lastTimestamp = 0; processing = false;
+  video.pause();
+  const begin = () => {
+    video.removeEventListener('seeked', begin);
+    processing = true; canvas.width = Math.min(video.videoWidth, 1280); canvas.height = Math.round(video.videoHeight * canvas.width / video.videoWidth);
+    canvas.style.display = 'block'; video.style.display = 'none'; setStatus('分析中，請保持頁面開啟…');
+    video.play().then(() => video.requestVideoFrameCallback(frameCallback)).catch(error => { processing = false; setStatus('影片播���失敗：' + error.message); });
+  };
+  if (Math.abs(video.currentTime - startTime) < 0.001) begin();
+  else { video.addEventListener('seeked', begin); video.currentTime = startTime; }
+}
+
+function renderChart() {
+  if (chart) chart.destroy();
+  chart = new Chart($('chart'), {type:'line', data:{labels:rows.map(row=>row.time_s.toFixed(3)), datasets:[
+    {label:'髖屈曲 (deg)',data:rows.map(row=>row.hip_flex_deg_filtered),borderColor:'#a78bfa',pointRadius:0},
+    {label:'膝屈曲 (deg)',data:rows.map(row=>row.knee_flex_deg_filtered),borderColor:'#22d3ee',pointRadius:0},
+    {label:'踝角度 (deg)',data:rows.map(row=>row.ankle_dorsi_deg_filtered),borderColor:'#f97316',pointRadius:0},
+    {label:'軀幹角度 (deg)',data:rows.map(row=>row.trunk_forward_deg_filtered),borderColor:'#fb7185',pointRadius:0}
+  ]}, options:{responsive:true,maintainAspectRatio:false,animation:false,scales:{x:{ticks:{color:'#94a3b8',maxTicksLimit:12},title:{display:true,text:'時間 (秒)',color:'#cbd5e1'}},y:{ticks:{color:'#94a3b8'},title:{display:true,text:'角度 (度)',color:'#cbd5e1'}}}}});
+}
+
+function renderSummary() {
+  const body = $('summary'); body.innerHTML = '';
+  const variables = [['髖屈曲 (deg)','hip_flex_deg_filtered'],['膝屈曲 (deg)','knee_flex_deg_filtered'],['踝角度 (deg)','ankle_dorsi_deg_filtered'],['軀幹角度 (deg)','trunk_forward_deg_filtered'],['COM x (m)','com_x_m_filtered'],['COM y (m)','com_y_m_filtered']];
+  for (const [label,key] of variables) {
+    const values = rows.map(row=>({value:row[key],time:row.time_s})).filter(item=>Number.isFinite(item.value));
+    if (!values.length) continue;
+    const min = values.reduce((a,b)=>a.value<b.value?a:b), max = values.reduce((a,b)=>a.value>b.value?a:b);
+    const average = values.reduce((sum,item)=>sum+item.value,0)/values.length;
+    body.insertAdjacentHTML('beforeend',`<tr><td>${label}</td><td>${min.value.toFixed(2)}</td><td>${min.time.toFixed(3)} s</td><td>${max.value.toFixed(2)}</td><td>${max.time.toFixed(3)} s</td><td>${average.toFixed(2)}</td><td>${(max.value-min.value).toFixed(2)}</td></tr>`);
+  }
+}
+
+function exportCsv() {
+  const columns = ['frame','time_s','hip_flex_deg','hip_flex_deg_filtered','knee_flex_deg','knee_flex_deg_filtered','ankle_dorsi_deg','ankle_dorsi_deg_filtered','trunk_forward_deg','trunk_forward_deg_filtered','com_x_m','com_x_m_filtered','com_y_m','com_y_m_filtered','com_vx_m_s','com_vy_m_s','com_ax_m_s2','com_ay_m_s2','net_fx_N','net_fy_N','grf_vertical_est_N','grf_vertical_est_BW','momentum_x_kg_m_s','momentum_y_kg_m_s','net_power_W','vertical_impulse_est_Ns'];
+  const csv = '\uFEFF' + [columns.join(','), ...rows.map(row=>columns.map(key=>Number.isFinite(row[key])?row[key]:'').join(','))].join('\r\n');
+  const link = $('csv'); link.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); link.download = 'taekwondo_analysis.csv'; link.classList.remove('hidden');
+}
+
+$('analyze').addEventListener('click', startAnalysis);
+$('prev').addEventListener('click',()=>{if(video.src){video.pause();canvas.style.display='none';video.style.display='block';video.currentTime=Math.max(0,video.currentTime-1/(Number($('fps').value)||120));}});
+$('next').addEventListener('click',()=>{if(video.src){video.pause();canvas.style.display='none';video.style.display='block';video.currentTime=Math.min(video.duration,video.currentTime+1/(Number($('fps').value)||120));}});
+$('slow').addEventListener('click',()=>{video.playbackRate=0.25;});
+$('half').addEventListener('click',()=>{video.playbackRate=0.5;});
+$('normal').addEventListener('click',()=>{video.playbackRate=1;});
+$('reset').addEventListener('click',()=>{processing=false;video.pause();video.removeAttribute('src');video.load();if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=null;rows=[];canvas.style.display='none';$('file').value='';$('summary').innerHTML='';$('time').textContent='時間：—';$('csv').classList.add('hidden');$('png').classList.add('hidden');if(chart){chart.destroy();chart=null;}setStatus(pose?'已重設。請重新選取影片。':'模型載入中…');});
+</script>
+</body>
+</html>
